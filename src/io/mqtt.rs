@@ -27,8 +27,11 @@ impl MqttSource {
         topic: Option<String>,
         broker: Option<String>,
         port: Option<u16>,
+        agent_name: Option<String>,
     ) -> Result<Self> {
-        let topic = topic.unwrap_or_else(|| "agent/input".to_string());
+        let agent_name = agent_name.unwrap_or_else(|| "agent".to_string());
+        let default_topic = format!("agent/{}/input", agent_name);
+        let topic = topic.unwrap_or_else(|| default_topic);
         let broker = broker.unwrap_or_else(|| "localhost".to_string());
         let port = port.unwrap_or(1883);
 
@@ -37,7 +40,7 @@ impl MqttSource {
             let mut rng = rand::thread_rng();
             rng.gen()
         };
-        let client_id = format!("agent-mqtt-input-{}", random_suffix);
+        let client_id = format!("{}-mqtt-input-{}", agent_name, random_suffix);
 
         // Create MQTT options with reconnection settings
         let mut mqtt_options = MqttOptions::new(&client_id, &broker, port);
@@ -163,8 +166,11 @@ impl MqttDestination {
         topic: Option<String>,
         broker: Option<String>,
         port: Option<u16>,
+        agent_name: Option<String>,
     ) -> Result<Self> {
-        let topic = topic.unwrap_or_else(|| "agent/output".to_string());
+        let agent_name = agent_name.unwrap_or_else(|| "agent".to_string());
+        let default_topic = format!("agent/{}/output", agent_name);
+        let topic = topic.unwrap_or_else(|| default_topic);
         let broker = broker.unwrap_or_else(|| "localhost".to_string());
         let port = port.unwrap_or(1883);
 
@@ -173,7 +179,7 @@ impl MqttDestination {
             let mut rng = rand::thread_rng();
             rng.gen()
         };
-        let client_id = format!("agent-mqtt-output-{}", random_suffix);
+        let client_id = format!("{}-mqtt-output-{}", agent_name, random_suffix);
 
         // Create MQTT options with reconnection settings
         let mut mqtt_options = MqttOptions::new(&client_id, &broker, port);

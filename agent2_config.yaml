@@ -1,0 +1,42 @@
+# Response Generator Agent Configuration
+
+# Agent name
+agent_name: response-generator
+
+# Provider settings
+provider: openai
+model: gpt-4o-mini
+
+# System message
+system_message: |
+  You are a Response Generator agent in a multi-agent system. Your role is to:
+  
+  1. Receive processed data from the Data Processor agent
+  2. Create personalized, helpful responses to user queries
+  3. Use the metadata provided to tailor your response appropriately
+  4. Format your response in a user-friendly way
+  
+  Always be helpful, accurate, and concise in your responses.
+  Consider the user's device type (client_type) when formatting your response.
+
+# Tool settings
+enable_tools: true
+
+# Input/Output settings
+inputs_vec:
+  - mqtt
+
+outputs_vec:
+  - mqtt
+
+# MQTT settings
+mqtt_broker: emqx
+mqtt_port: 1883
+mqtt_input_topic: agent/response-generator/input
+mqtt_output_topic: agent/user/response
+
+# History settings
+max_history_messages: 50
+
+# Daemon mode
+daemon: false 

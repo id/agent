@@ -1,0 +1,58 @@
+services:
+  # EMQX MQTT Broker
+  emqx:
+    image: emqx/emqx:5.8.5
+    container_name: emqx
+    ports:
+      - "1883:1883"   # MQTT port
+      - "8083:8083"   # MQTT over WebSocket port
+      - "8084:8084"   # MQTT over WSS port
+      - "8883:8883"   # MQTT over TLS port
+      - "18083:18083" # Dashboard port
+    environment:
+      - EMQX_NAME=emqx
+      - EMQX_DASHBOARD__DEFAULT_USERNAME=admin
+      - EMQX_DASHBOARD__DEFAULT_PASSWORD=public
+    volumes:
+      - ./emqx_rule.json:/opt/emqx/etc/emqx_rule.json
+    networks:
+      - mqtt_network
+
+  # Build the agent image separately
+  agent-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mqtt-agent:latest
+    profiles:
+      - build-only
+
+  # Agent 1: Data Processor
+  agent1:
+    image: mqtt-agent:latest
+    container_name: data-processor-agent
+    depends_on:
+      - emqx
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./agent1_config.yaml:/app/config.yaml
+    networks:
+      - mqtt_network
+
+  # Agent 2: Response Generator
+  agent2:
+    image: mqtt-agent:latest
+    container_name: response-generator-agent
+    depends_on:
+      - emqx
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./agent2_config.yaml:/app/config.yaml
+    networks:
+      - mqtt_network
+
+networks:
+  mqtt_network:
+    driver: bridge 

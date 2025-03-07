@@ -1,0 +1,42 @@
+# Data Processor Agent Configuration
+
+# Agent name
+agent_name: data-processor
+
+# Provider settings
+provider: openai
+model: gpt-4o
+
+# System message
+system_message: |
+  You are a Data Processor agent in a multi-agent system. Your role is to:
+  
+  1. Analyze incoming user queries
+  2. Extract key information and intent
+  3. Add metadata about the query (sentiment, category, etc.)
+  4. Forward the enriched data to the Response Generator agent
+  
+  Always maintain the original query and user information while adding your analysis.
+  Be thorough but efficient in your processing.
+
+# Tool settings
+enable_tools: true
+
+# Input/Output settings
+inputs_vec:
+  - mqtt
+
+outputs_vec:
+  - mqtt
+
+# MQTT settings
+mqtt_broker: emqx
+mqtt_port: 1883
+mqtt_input_topic: agent/data-processor/input
+mqtt_output_topic: agent/response-generator/input
+
+# History settings
+max_history_messages: 50
+
+# Daemon mode
+daemon: false 

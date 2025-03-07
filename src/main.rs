@@ -223,6 +223,10 @@ async fn main() -> Result<()> {
     let mut config = Config::from_yaml(config_path)?;
 
     // Update config with command line arguments
+    if !args.agent_name.is_empty() {
+        config.agent_name = args.agent_name;
+    }
+
     if !args.provider.is_empty() {
         config.provider = args.provider;
     }
@@ -282,6 +286,7 @@ async fn main() -> Result<()> {
 
     // Print the final configuration
     tracing::info!("Final configuration:");
+    tracing::info!("  Agent name: {}", config.agent_name);
     tracing::info!("  Inputs: {:?}", config.inputs_vec);
     tracing::info!("  Outputs: {:?}", config.outputs_vec);
 
@@ -408,6 +413,7 @@ async fn main() -> Result<()> {
         let mqtt_input_topic = config.mqtt_input_topic.clone();
         let mqtt_broker = config.mqtt_broker.clone();
         let mqtt_port = config.mqtt_port;
+        let agent_name = config.agent_name.clone();
 
         // Create a task to monitor this input
         input_tasks.spawn(async move {
@@ -421,6 +427,7 @@ async fn main() -> Result<()> {
                         mqtt_input_topic,
                         mqtt_broker,
                         mqtt_port,
+                        Some(agent_name),
                     ).await.expect("Failed to create MQTT source");
                     Box::new(mqtt_source) as Box<dyn crate::io::InputSource>
                 },

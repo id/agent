@@ -131,6 +131,7 @@ All options that can be specified on the command line can also be specified in t
 - `--mqtt-port`: MQTT broker port (default: 1883)
 - `--mqtt-input-topic`: MQTT topic to subscribe to for input (default: "agent/input")
 - `--mqtt-output-topic`: MQTT topic to publish to for output (default: "agent/output")
+- `--agent-name`: Name of the agent (default: "agent", used for MQTT topic prefixes)
 
 ## Available Tools
 
@@ -328,9 +329,14 @@ You can customize the MQTT connection using the following options:
 - `--mqtt-port`: MQTT broker port (default: 1883)
 - `--mqtt-input-topic`: MQTT topic to subscribe to for input (default: "agent/input")
 - `--mqtt-output-topic`: MQTT topic to publish to for output (default: "agent/output")
+- `--agent-name`: Name of the agent (default: "agent", used for MQTT topic prefixes)
 
 Example:
 
 ```
 cargo run --release -- --inputs mqtt --outputs mqtt --mqtt-broker "mqtt.example.com" --mqtt-port 8883 --mqtt-input-topic "my/input/topic" --mqtt-output-topic "my/output/topic"
 ```
+
+## Multi-Agent Demo
+
+For information about running a multi-agent demo with MQTT, see [DEMO.md](DEMO.md).

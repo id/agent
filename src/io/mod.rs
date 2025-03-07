@@ -39,6 +39,7 @@ pub async fn create_input_sources(config: &crate::config::Config) -> Vec<Box<dyn
                     config.mqtt_input_topic.clone(),
                     config.mqtt_broker.clone(),
                     config.mqtt_port,
+                    Some(config.agent_name.clone()),
                 )
                 .await
                 .expect("Failed to create MQTT source");
@@ -70,6 +71,7 @@ pub async fn create_output_destinations(
                     config.mqtt_output_topic.clone(),
                     config.mqtt_broker.clone(),
                     config.mqtt_port,
+                    Some(config.agent_name.clone()),
                 )
                 .await
                 .expect("Failed to create MQTT destination");

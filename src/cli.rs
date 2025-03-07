@@ -7,6 +7,10 @@ pub struct Args {
     #[arg(short, long)]
     pub config: Option<String>,
 
+    /// Name of the agent instance (default: "agent")
+    #[arg(short = 'n', long, default_value = "agent")]
+    pub agent_name: String,
+
     /// Provider to use (e.g., openai, anthropic)
     #[arg(short, long, default_value = "openai")]
     pub provider: String,
@@ -47,11 +51,11 @@ pub struct Args {
     #[arg(long)]
     pub mqtt_port: Option<u16>,
 
-    /// MQTT input topic (default: agent/input)
+    /// MQTT input topic (default: agent/{agent_name}/input)
     #[arg(long)]
     pub mqtt_input_topic: Option<String>,
 
-    /// MQTT output topic (default: agent/output)
+    /// MQTT output topic (default: agent/{agent_name}/output)
     #[arg(long)]
     pub mqtt_output_topic: Option<String>,
 

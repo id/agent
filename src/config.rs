@@ -3,6 +3,9 @@ use anyhow::{Context, Result};
 /// Configuration for the agent
 #[derive(Debug, Clone)]
 pub struct Config {
+    /// Name of the agent instance (default: "agent")
+    pub agent_name: String,
+
     /// Provider to use (e.g., openai, anthropic)
     pub provider: String,
 
@@ -30,10 +33,10 @@ pub struct Config {
     /// MQTT broker port (default: 1883)
     pub mqtt_port: Option<u16>,
 
-    /// MQTT input topic (default: agent/input)
+    /// MQTT input topic (default: agent/{agent_name}/input)
     pub mqtt_input_topic: Option<String>,
 
-    /// MQTT output topic (default: agent/output)
+    /// MQTT output topic (default: agent/{agent_name}/output)
     pub mqtt_output_topic: Option<String>,
 
     /// Maximum number of messages to keep in history (default: 50)
@@ -50,6 +53,7 @@ impl Config {
             serde_yaml::from_str(&contents).context("Failed to parse YAML config")?;
 
         // Extract values with defaults
+        let agent_name = config["agent_name"].as_str().unwrap_or("agent").to_string();
         let provider = config["provider"].as_str().unwrap_or("openai").to_string();
         let model = config["model"].as_str().unwrap_or("gpt-4o").to_string();
         let system_message = config["system_message"].as_str().unwrap_or("").to_string();
@@ -92,6 +96,7 @@ impl Config {
         }
 
         Ok(Config {
+            agent_name,
             provider,
             model,
             system_message,

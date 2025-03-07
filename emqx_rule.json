@@ -1,0 +1,16 @@
+{
+  "sql": "SELECT * FROM \"agent/user/query\"",
+  "name": "user_query_forward",
+  "actions": [
+    {
+      "function": "republish",
+      "args": {
+        "topic": "agent/data-processor/input",
+        "payload": "{\"role\": \"user\", \"content\": \"${payload.query}\", \"user_id\": \"${payload.user_id}\", \"client_type\": \"${payload.client_type}\", \"clientid\": \"${clientid}\", \"username\": \"${username}\", \"peerhost\": \"${peerhost}\", \"topic\": \"${topic}\", \"qos\": \"${qos}\", \"timestamp\": ${timestamp}, \"received_at\": \"${publish_received_at}\", \"node\": \"${node}\"}",
+        "qos": 1
+      }
+    }
+  ],
+  "description": "Process user queries and forward to data processor agent",
+  "enable": true
+} 
