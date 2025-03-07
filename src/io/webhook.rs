@@ -17,6 +17,8 @@ use tracing::{info, error};
 use portpicker::pick_unused_port;
 use tokio::net::TcpListener;
 use reqwest;
+use serde_json::json;
+use std::time::SystemTime;
 
 use super::{InputSource, OutputDestination};
 
@@ -110,6 +112,10 @@ impl InputSource for WebhookSource {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
+    
+    fn clone_box(&self) -> Box<dyn InputSource> {
+        Box::new(WebhookSource::new())
+    }
 }
 
 impl Drop for WebhookSource {
@@ -190,20 +196,20 @@ async fn health_check() -> impl IntoResponse {
 
 // Webhook output destination implementation
 pub struct WebhookDestination {
-    webhook_url: Option<String>,
+    url: String,
 }
 
 impl WebhookDestination {
-    pub fn new() -> Self {
-        WebhookDestination {
-            webhook_url: None,
-        }
+    /// Create a new webhook destination
+    pub fn new(url: &str) -> Result<Self> {
+        Ok(Self {
+            url: url.to_string(),
+        })
     }
     
-    pub fn with_url(url: String) -> Self {
-        WebhookDestination {
-            webhook_url: Some(url),
-        }
+    // Get the webhook URL
+    pub fn url(&self) -> &str {
+        &self.url
     }
 }
 
@@ -221,58 +227,41 @@ impl OutputDestination for WebhookDestination {
     }
     
     async fn write_message(&self, role: &str, content: &str) -> Result<()> {
-        // Log the message
-        info!("WebhookDestination: Message with role '{}': {}", role, content);
-        
         // If we have a webhook URL and the role is "assistant", send the message
         // You can modify this condition to include other roles if needed
-        if let Some(url) = &self.webhook_url {
-            if role == "assistant" {
-                info!("Sending webhook to URL: {}", url);
-                
-                let client = reqwest::Client::builder()
-                    .timeout(std::time::Duration::from_secs(3)) // Shorter timeout
-                    .build()
-                    .unwrap_or_else(|_| reqwest::Client::new());
-                
-                // Create the message payload
-                let message = WebhookOutgoingMessage {
-                    role: role.to_string(),
-                    content: content.to_string(),
-                    timestamp: std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs(),
-                };
-                
-                // Send the message in a separate task to avoid blocking
-                let url_clone = url.clone();
-                tokio::spawn(async move {
-                    // Try to send the message once with less verbose error handling
-                    match client.post(&url_clone)
-                        .json(&message)
-                        .send()
-                        .await {
-                        Ok(response) => {
-                            let status = response.status();
-                            if status.is_success() {
-                                info!("Successfully sent webhook message: HTTP {}", status);
-                            } else {
-                                // Log at info level instead of error for HTTP errors
-                                info!("Webhook server responded with non-success status: HTTP {}", status);
-                            }
-                        },
-                        Err(e) => {
-                            // Log at info level instead of error for connection errors
-                            info!("Could not send webhook message: {} - This is normal if the webhook server is not running", e);
-                        }
+        if role == "assistant" {
+            info!("Sending webhook to URL: {}", self.url);
+            
+            // Create the JSON payload
+            let json = json!({
+                "role": role,
+                "content": content,
+                "timestamp": SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs(),
+            });
+            
+            // Send the webhook
+            let client = reqwest::Client::new();
+            match client.post(&self.url)
+                .header("Content-Type", "application/json")
+                .json(&json)
+                .send()
+                .await 
+            {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        info!("Webhook sent successfully");
+                    } else {
+                        error!("Failed to send webhook: HTTP {}", response.status());
                     }
-                });
-            } else {
-                info!("Skipping webhook for non-assistant message: {}", role);
+                },
+                Err(e) => {
+                    error!("Failed to send webhook: {}", e);
+                    return Err(anyhow::anyhow!("Failed to send webhook: {}", e));
+                }
             }
-        } else {
-            info!("No webhook URL configured, skipping webhook send");
         }
         
         Ok(())

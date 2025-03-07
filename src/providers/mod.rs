@@ -1,5 +1,5 @@
-pub mod openai;
 pub mod anthropic;
+pub mod openai;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -54,12 +54,11 @@ pub struct ChatCompletionResponse {
 pub trait Provider: Send + Sync {
     /// Get the name of the provider
     fn name(&self) -> &str;
-    
+
     /// Get the available models for this provider
-    #[allow(dead_code)]
     fn available_models(&self) -> Vec<String>;
-    
-    /// Send a chat completion request to the provider
+
+    /// Get a chat completion from the provider
     async fn chat_completion(
         &self,
         model: &str,
@@ -74,4 +73,4 @@ pub fn get_provider(provider_name: &str, api_key: &str) -> Result<Box<dyn Provid
         "anthropic" => Ok(Box::new(anthropic::AnthropicProvider::new(api_key))),
         _ => anyhow::bail!("Unsupported provider: {}", provider_name),
     }
-} 
+}

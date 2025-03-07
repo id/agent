@@ -1,10 +1,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use reqwest::{Client, header};
+use reqwest::{header, Client};
 use serde::Deserialize;
 use serde_json::json;
 
-use super::{ChatCompletionResponse, Message, Provider, Tool, ToolCall, FunctionCall};
+use super::{ChatCompletionResponse, FunctionCall, Message, Provider, Tool, ToolCall};
 
 pub struct OpenAIProvider {
     client: Client,
@@ -24,12 +24,9 @@ impl OpenAIProvider {
             header::HeaderValue::from_static("application/json"),
         );
 
-        let client = Client::builder()
-            .default_headers(headers)
-            .build()
-            .unwrap();
+        let client = Client::builder().default_headers(headers).build().unwrap();
 
-        OpenAIProvider { 
+        OpenAIProvider {
             client,
             api_key: api_key.to_string(),
         }
@@ -67,7 +64,8 @@ impl Provider for OpenAIProvider {
             request["tool_choice"] = json!("auto");
         }
 
-        let response = self.client
+        let response = self
+            .client
             .post("https://api.openai.com/v1/chat/completions")
             .json(&request)
             .send()
@@ -80,25 +78,26 @@ impl Provider for OpenAIProvider {
         }
 
         let response_json: OpenAIChatCompletionResponse = response.json().await?;
-        
+
         // Extract the first choice from the response
         if let Some(choice) = response_json.choices.first() {
             let message = choice.message.clone();
-            
+
             // Convert OpenAI's response format to our common format
             let tool_calls_converted = message.tool_calls.map(|calls| {
-                calls.into_iter().map(|call| {
-                    ToolCall {
+                calls
+                    .into_iter()
+                    .map(|call| ToolCall {
                         id: Some(call.id),
                         type_: Some(call.type_),
                         function: Some(FunctionCall {
                             name: call.function.name,
                             arguments: call.function.arguments,
                         }),
-                    }
-                }).collect()
+                    })
+                    .collect()
             });
-            
+
             Ok(ChatCompletionResponse {
                 message: Message {
                     role: message.role,
@@ -161,4 +160,4 @@ struct OpenAIUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
     total_tokens: u32,
-} 
+}

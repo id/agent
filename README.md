@@ -61,18 +61,76 @@ To enable tool usage:
 cargo run --release -- --enable-tools
 ```
 
-Available command-line options:
+### YAML Configuration
 
+Instead of specifying all options on the command line, you can use a YAML configuration file:
+
+```
+cargo run --release -- --config config.yaml
+```
+
+Example `config.yaml`:
+
+```yaml
+# Agent Configuration
+
+# Provider settings
+provider: openai
+model: gpt-4o
+
+# System message
+system_message: |
+  You are a helpful AI assistant with access to tools for retrieving weather information 
+  and performing calculations. You can answer questions, provide information, and assist 
+  with various tasks. When asked about weather or calculations, use the appropriate tools 
+  to provide accurate responses. Be concise, helpful, and friendly in your interactions.
+
+# Tool settings
+enable_tools: true
+
+# Input/Output settings
+inputs_vec:
+  - mqtt
+  - stdin
+
+outputs_vec:
+  - mqtt
+  - stdout
+
+# Webhook settings
+# webhook_url: http://localhost:8000
+
+# MQTT settings
+mqtt_broker: broker.emqx.io
+mqtt_port: 1883
+mqtt_input_topic: agent/input
+mqtt_output_topic: agent/output
+
+# Daemon mode
+daemon: false
+```
+
+Note that in the YAML configuration, inputs and outputs are specified as lists (`inputs_vec` and `outputs_vec`) rather than comma-separated strings. This makes the configuration more readable and easier to maintain.
+
+All options that can be specified on the command line can also be specified in the YAML configuration file.
+
+### Available Command-Line Options
+
+- `--config` or `-c`: Path to YAML configuration file
 - `--provider` or `-p`: AI provider to use (default: "openai", options: "openai", "anthropic")
 - `--model` or `-m`: Model to use (default: "gpt-4o")
   - OpenAI models: "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"
   - Anthropic models: "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"
 - `--system-message` or `-s`: System message to set the behavior of the assistant (default provides instructions about available tools and expected behavior)
 - `--enable-tools` or `-e`: Enable tool usage (functions)
-- `--inputs`: Comma-separated list of input sources (default: "stdin", options: "stdin", "webhook")
-- `--outputs`: Comma-separated list of output destinations (default: "stdout", options: "stdout", "webhook")
+- `--inputs`: Comma-separated list of input sources (default: "stdin", options: "stdin", "webhook", "mqtt")
+- `--outputs`: Comma-separated list of output destinations (default: "stdout", options: "stdout", "webhook", "mqtt")
 - `--daemon`: Run as a daemon (fork to background)
 - `--webhook-url`: URL to send webhook output to (required when using webhook output)
+- `--mqtt-broker`: MQTT broker address (default: "broker.emqx.io")
+- `--mqtt-port`: MQTT broker port (default: 1883)
+- `--mqtt-input-topic`: MQTT topic to subscribe to for input (default: "agent/input")
+- `--mqtt-output-topic`: MQTT topic to publish to for output (default: "agent/output")
 
 ## Available Tools
 
@@ -105,11 +163,12 @@ The application supports multiple input sources and output destinations:
 
 - `stdin`: Read user input from the standard input (default)
 - `webhook`: Start an HTTP server that accepts POST requests with JSON payloads
+- `mqtt`: Subscribe to an MQTT topic for input messages
 
 You can specify multiple input sources using the `--inputs` option:
 
 ```
-cargo run --release -- --inputs "stdin,webhook"
+cargo run --release -- --inputs "stdin,webhook,mqtt"
 ```
 
 ### Webhook Server
@@ -134,8 +193,9 @@ The application will display the port number when it starts.
 
 - `stdout`: Write output to the standard output (default)
 - `webhook`: Send assistant responses to a webhook URL specified with `--webhook-url`
+- `mqtt`: Publish assistant responses to an MQTT topic
 
-When using the webhook output destination, only messages with the "assistant" role (the AI's responses) will be sent to the webhook URL. The webhook payload has the following format:
+When using the webhook or MQTT output destinations, only messages with the "assistant" role (the AI's responses) will be sent. The payload format is the same for both:
 
 ```json
 {
@@ -148,7 +208,7 @@ When using the webhook output destination, only messages with the "assistant" ro
 You can specify multiple output destinations using the `--outputs` option:
 
 ```
-cargo run --release -- --outputs "stdout,webhook" --webhook-url "http://localhost:8000/webhook"
+cargo run --release -- --outputs "stdout,webhook,mqtt" --webhook-url "http://localhost:8000/webhook"
 ```
 
 To receive webhook outputs, you can use a simple HTTP server like netcat:
@@ -209,4 +269,68 @@ To add a new provider:
 
 ## Error Handling
 
-The application uses the `anyhow` crate for error handling. If any errors occur during API calls or processing, they will be displayed with appropriate context. 
+The application uses the `anyhow` crate for error handling. If any errors occur during API calls or processing, they will be displayed with appropriate context.
+
+## MQTT Support
+
+The application supports MQTT for both input and output. By default, it connects to the public MQTT broker at broker.emqx.io on port 1883 without authentication.
+
+### MQTT Input
+
+When using MQTT as an input source, the application subscribes to the topic specified by `--mqtt-input-topic` (default: "agent/input"). It accepts messages in two formats:
+
+1. Plain text messages, which are treated as user input
+2. JSON messages with the following format:
+
+```json
+{
+  "role": "user",
+  "content": "Your message here",
+  "timestamp": 1741352595
+}
+```
+
+You can publish messages to the MQTT topic using any MQTT client. For example, using the mosquitto_pub command-line tool:
+
+```
+mosquitto_pub -h broker.emqx.io -t agent/input -m "What is 2+2?"
+```
+
+Or with a JSON payload:
+
+```
+mosquitto_pub -h broker.emqx.io -t agent/input -m '{"role":"user","content":"What is 2+2?","timestamp":1741352595}'
+```
+
+### MQTT Output
+
+When using MQTT as an output destination, the application publishes the assistant's responses to the topic specified by `--mqtt-output-topic` (default: "agent/output"). The messages are published in JSON format:
+
+```json
+{
+  "role": "assistant",
+  "content": "The AI's response",
+  "timestamp": 1741352595
+}
+```
+
+You can subscribe to the MQTT topic using any MQTT client. For example, using the mosquitto_sub command-line tool:
+
+```
+mosquitto_sub -h broker.emqx.io -t agent/output
+```
+
+### Custom MQTT Configuration
+
+You can customize the MQTT connection using the following options:
+
+- `--mqtt-broker`: MQTT broker address (default: "broker.emqx.io")
+- `--mqtt-port`: MQTT broker port (default: 1883)
+- `--mqtt-input-topic`: MQTT topic to subscribe to for input (default: "agent/input")
+- `--mqtt-output-topic`: MQTT topic to publish to for output (default: "agent/output")
+
+Example:
+
+```
+cargo run --release -- --inputs mqtt --outputs mqtt --mqtt-broker "mqtt.example.com" --mqtt-port 8883 --mqtt-input-topic "my/input/topic" --mqtt-output-topic "my/output/topic"
+```

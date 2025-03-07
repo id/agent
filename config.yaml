@@ -1,0 +1,36 @@
+# Agent Configuration
+
+# Provider settings
+provider: openai
+model: gpt-4o
+
+# System message
+system_message: |
+  You are a helpful AI assistant with access to tools for retrieving weather information 
+  and performing calculations. You can answer questions, provide information, and assist 
+  with various tasks. When asked about weather or calculations, use the appropriate tools 
+  to provide accurate responses. Be concise, helpful, and friendly in your interactions.
+
+# Tool settings
+enable_tools: true
+
+# Input/Output settings
+inputs_vec:
+  - mqtt
+  - stdin
+
+outputs_vec:
+  - mqtt
+  - stdout
+
+# Webhook settings
+# webhook_url: http://localhost:8000
+
+# MQTT settings
+mqtt_broker: localhost
+mqtt_port: 1883
+mqtt_input_topic: agent/input
+mqtt_output_topic: agent/output
+
+# Daemon mode
+daemon: false 

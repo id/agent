@@ -1,30 +1,72 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use std::io::{self, BufRead, IsTerminal};
-use tokio::sync::Mutex;
+use std::io::{self, BufRead};
+use tokio::sync::mpsc;
 use tokio::task;
-use std::sync::Arc;
+use tracing::error;
 
 use super::InputSource;
 
 pub struct StdinSource {
-    // Use a Mutex to make it thread-safe
-    stdin_mutex: Arc<Mutex<()>>,
-    // Flag to indicate if stdin is from a pipe (not a terminal)
-    is_pipe: bool,
-    // Flag to indicate if we've already read a message from a pipe
-    has_read_from_pipe: bool,
+    message_rx: mpsc::Receiver<String>,
+    _shutdown_tx: tokio::sync::broadcast::Sender<()>, // Keep sender alive
 }
 
 impl StdinSource {
     pub fn new() -> Self {
-        // Check if stdin is a terminal or a pipe
-        let is_pipe = !io::stdin().is_terminal();
-        
-        StdinSource {
-            stdin_mutex: Arc::new(Mutex::new(())),
-            is_pipe,
-            has_read_from_pipe: false,
+        let (message_tx, message_rx) = mpsc::channel(100);
+
+        // Create a shutdown channel that is Send
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
+        let shutdown_tx_clone = shutdown_tx.clone();
+
+        // Spawn a task to read from stdin
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    // Check for shutdown signal
+                    _ = shutdown_rx.recv() => {
+                        tracing::info!("Stdin source shutting down");
+                        break;
+                    }
+                    // Read from stdin
+                    line_result = task::spawn_blocking(|| {
+                        let mut line = String::new();
+                        io::stdin().lock().read_line(&mut line).map(|_| line)
+                    }) => {
+                        let line = match line_result {
+                            Ok(result) => result,
+                            Err(e) => {
+                                error!("Failed to spawn blocking task: {}", e);
+                                break;
+                            }
+                        };
+
+                        match line {
+                            Ok(line) => {
+                                let line = line.trim().to_string();
+                                if !line.is_empty() {
+                                    if message_tx.send(line).await.is_err() {
+                                        error!("Failed to send message to channel");
+                                        break;
+                                    }
+                                }
+                            },
+                            Err(e) => {
+                                error!("Failed to read from stdin: {}", e);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            tracing::info!("Stdin source task completed");
+        });
+
+        Self {
+            message_rx,
+            _shutdown_tx: shutdown_tx_clone, // Store sender to keep it alive
         }
     }
 }
@@ -34,46 +76,11 @@ impl InputSource for StdinSource {
     fn name(&self) -> &str {
         "stdin"
     }
-    
+
     async fn read_message(&mut self) -> Result<Option<String>> {
-        // If we're reading from a pipe and we've already read a message,
-        // return None to indicate we're done
-        if self.is_pipe && self.has_read_from_pipe {
-            return Ok(None);
+        match self.message_rx.recv().await {
+            Some(message) => Ok(Some(message)),
+            None => Ok(None),
         }
-        
-        // Acquire the mutex to ensure only one thread is reading from stdin at a time
-        let _lock = self.stdin_mutex.lock().await;
-        
-        // Use spawn_blocking because stdin operations are blocking
-        let result = task::spawn_blocking(|| {
-            let stdin = io::stdin();
-            let mut line = String::new();
-            match stdin.lock().read_line(&mut line) {
-                Ok(0) => Ok(None), // EOF
-                Ok(_) => {
-                    // Trim the trailing newline
-                    if line.ends_with('\n') {
-                        line.pop();
-                        if line.ends_with('\r') {
-                            line.pop();
-                        }
-                    }
-                    Ok(Some(line))
-                },
-                Err(e) => Err(anyhow::anyhow!("Failed to read from stdin: {}", e)),
-            }
-        }).await??;
-        
-        // If we got a message from a pipe, set the flag
-        if self.is_pipe && result.is_some() {
-            self.has_read_from_pipe = true;
-        }
-        
-        Ok(result)
     }
-    
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-} 
+}

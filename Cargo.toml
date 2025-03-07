@@ -24,3 +24,14 @@ daemonize = "0.5"
 # For logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# For MQTT
+rumqttc = "0.23"
+rand = "0.8"
+# For YAML configuration
+serde_yaml = "0.9"
+# For user/group operations
+users = "0.11"
+# For concurrent operations
+futures = "0.3"
+
+# Main binary is automatically included

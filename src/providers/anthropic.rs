@@ -1,10 +1,10 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use reqwest::{Client, header};
+use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use super::{ChatCompletionResponse, Message, Provider, Tool, ToolCall, FunctionCall};
+use super::{ChatCompletionResponse, FunctionCall, Message, Provider, Tool, ToolCall};
 
 pub struct AnthropicProvider {
     client: Client,
@@ -15,10 +15,7 @@ pub struct AnthropicProvider {
 impl AnthropicProvider {
     pub fn new(api_key: &str) -> Self {
         let mut headers = header::HeaderMap::new();
-        headers.insert(
-            "x-api-key",
-            header::HeaderValue::from_str(api_key).unwrap(),
-        );
+        headers.insert("x-api-key", header::HeaderValue::from_str(api_key).unwrap());
         headers.insert(
             "Content-Type",
             header::HeaderValue::from_static("application/json"),
@@ -28,12 +25,9 @@ impl AnthropicProvider {
             header::HeaderValue::from_static("2023-06-01"),
         );
 
-        let client = Client::builder()
-            .default_headers(headers)
-            .build()
-            .unwrap();
+        let client = Client::builder().default_headers(headers).build().unwrap();
 
-        AnthropicProvider { 
+        AnthropicProvider {
             client,
             api_key: api_key.to_string(),
         }
@@ -92,14 +86,15 @@ impl Provider for AnthropicProvider {
             request["tools"] = json!(anthropic_tools);
         }
 
-        let response = self.client
+        let response = self
+            .client
             .post("https://api.anthropic.com/v1/messages")
             .json(&request)
             .send()
             .await?;
 
         let response_json: AnthropicResponse = response.json().await?;
-        
+
         // Convert Anthropic's response to our common format
         let content = if let Some(content) = response_json.content.first() {
             content.text.clone()
@@ -183,4 +178,4 @@ struct AnthropicToolUse {
     type_: String,
     name: String,
     input: Value,
-} 
+}
