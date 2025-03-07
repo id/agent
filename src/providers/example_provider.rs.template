@@ -1,0 +1,100 @@
+use anyhow::Result;
+use async_trait::async_trait;
+use reqwest::{Client, header};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use super::{ChatCompletionResponse, Message, Provider, Tool, ToolCall, FunctionCall};
+
+pub struct ExampleProvider {
+    client: Client,
+    api_key: String,
+}
+
+impl ExampleProvider {
+    pub fn new(api_key: &str) -> Self {
+        let mut headers = header::HeaderMap::new();
+        headers.insert(
+            "Authorization",
+            header::HeaderValue::from_str(&format!("Bearer {}", api_key)).unwrap(),
+        );
+        headers.insert(
+            "Content-Type",
+            header::HeaderValue::from_static("application/json"),
+        );
+
+        let client = Client::builder()
+            .default_headers(headers)
+            .build()
+            .unwrap();
+
+        ExampleProvider { 
+            client,
+            api_key: api_key.to_string(),
+        }
+    }
+}
+
+#[async_trait]
+impl Provider for ExampleProvider {
+    fn name(&self) -> &str {
+        "example"
+    }
+
+    fn available_models(&self) -> Vec<String> {
+        vec![
+            "example-model-1".to_string(),
+            "example-model-2".to_string(),
+        ]
+    }
+
+    async fn chat_completion(
+        &self,
+        model: &str,
+        messages: &[Message],
+        tools: Option<&[Tool]>,
+    ) -> Result<ChatCompletionResponse> {
+        // Create the request payload according to the provider's API
+        let mut request = json!({
+            "model": model,
+            "messages": messages,
+        });
+
+        if let Some(tools) = tools {
+            // Add tools to the request if needed
+            request["tools"] = json!(tools);
+        }
+
+        // Send the request to the provider's API
+        let response = self.client
+            .post("https://api.example.com/v1/chat/completions")
+            .json(&request)
+            .send()
+            .await?;
+
+        // Parse the response
+        let response_json = response.json::<Value>().await?;
+        
+        // Extract the response content
+        let content = response_json["choices"][0]["message"]["content"]
+            .as_str()
+            .unwrap_or("")
+            .to_string();
+        
+        // Return the response in our common format
+        Ok(ChatCompletionResponse {
+            message: Message {
+                role: "assistant".to_string(),
+                content,
+            },
+            tool_calls: None, // Parse tool calls if the provider supports them
+        })
+    }
+}
+
+// To add this provider to the application:
+// 1. Add it to the mod.rs file:
+//    pub mod example_provider;
+// 
+// 2. Update the get_provider function:
+//    "example" => Ok(Box::new(example_provider::ExampleProvider::new(api_key))), 
